@@ -1,0 +1,54 @@
+<?jelly escape-by-default='true'?>
+<j:jelly xmlns:j="jelly:core"
+         xmlns:f="/lib/form">
+    <f:entry title="Fabric API key" field="apiKey">
+        <f:textbox/>
+    </f:entry>
+    <f:entry title="Fabric build secret" field="buildSecret">
+        <f:textbox/>
+    </f:entry>
+
+    <f:entry title=".apk file path" field="apkPath">
+        <f:textbox default="app/build/outputs/apk/app-debug.apk"/>
+    </f:entry>
+
+    <f:section title="Notify testers">
+        <f:radioBlock name="notifyTestersType" title="Testers group" value="NOTIFY_TESTERS_EMAILS"
+                      checked="${instance.isNotifyTestersType('NOTIFY_TESTERS_EMAILS')}" inline="true">
+            <f:nested>
+                <f:entry title="Group name" field="testersGroup">
+                    <f:textbox/>
+                </f:entry>
+            </f:nested>
+        </f:radioBlock>
+
+        <f:radioBlock name="notifyTestersType" title="Testers e-mails" value="NOTIFY_TESTERS_GROUP"
+                      checked="${instance.isNotifyTestersType('NOTIFY_TESTERS_GROUP')}" inline="true">
+            <f:nested>
+                <f:entry title="E-mails (comma separated)" field="testersEmails">
+                    <f:textbox/>
+                </f:entry>
+            </f:nested>
+        </f:radioBlock>
+
+        <f:radioBlock name="notifyTestersType" title="Don't notify testers" value="NOTIFY_TESTERS_GROUP"
+                      checked="${instance.isNotifyTestersType('NOTIFY_TESTERS_NONE')}" inline="true"/>
+    </f:section>
+
+    <f:section title="Release notes">
+        <f:radioBlock name="releaseNotesType" title="From changelog" value="RELEASE_NOTES_FROM_CHANGELOG"
+                      checked="${instance.isReleaseNotesType('RELEASE_NOTES_FROM_CHANGELOG')}" inline="true"/>
+
+        <f:radioBlock name="releaseNotesType" title="From parameter" value="RELEASE_NOTES_PARAMETER"
+                      checked="${instance.isReleaseNotesType('RELEASE_NOTES_PARAMETER')}" inline="true">
+            <f:nested>
+                <f:entry title="Parameter name" field="releaseNotesParameter">
+                    <f:textbox default="FABRIC_RELEASE_NOTES"/>
+                </f:entry>
+            </f:nested>
+        </f:radioBlock>
+
+        <f:radioBlock name="releaseNotesType" title="No release notes" value="RELEASE_NOTES_NONE"
+                      checked="${instance.isReleaseNotesType('RELEASE_NOTES_NONE')}" inline="true"/>
+    </f:section>
+</j:jelly>
