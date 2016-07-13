@@ -84,11 +84,12 @@ public class FabricBetaPublisher extends Recorder {
 
         boolean failure = false;
         String s;
-        BufferedReader stdError = new BufferedReader(new InputStreamReader(p.getErrorStream()));
+        BufferedReader stdError = new BufferedReader(new InputStreamReader(p.getErrorStream(), "UTF-8"));
         while ((s = stdError.readLine()) != null) {
             logger.println(s);
             failure = true;
         }
+        stdError.close();
         return !failure;
     }
 
