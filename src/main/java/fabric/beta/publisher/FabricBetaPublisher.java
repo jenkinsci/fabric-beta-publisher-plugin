@@ -13,6 +13,7 @@ import hudson.tasks.BuildStepMonitor;
 import hudson.tasks.Publisher;
 import hudson.tasks.Recorder;
 import hudson.util.FormValidation;
+import net.lingala.zip4j.exception.ZipException;
 import net.sf.json.JSONObject;
 import org.kohsuke.stapler.DataBoundConstructor;
 import org.kohsuke.stapler.QueryParameter;
@@ -24,21 +25,14 @@ import java.io.*;
 import java.util.ArrayList;
 import java.util.List;
 
+import static fabric.beta.publisher.FileUtils.downloadCrashlyticsTools;
 import static fabric.beta.publisher.FileUtils.getManifestFile;
 
-@SuppressWarnings({"unused", "WeakerAccess"})
 public class FabricBetaPublisher extends Recorder {
-    private static final String RELEASE_NOTES_FORMAT = "text";
-    private static final String APP_TYPE = "android_app";
-    private static final String ARCHITECTURE = "java";
-    private static final String MULTIPART_FORM_DATA = "multipart/form-data";
-
     private static final String RELEASE_NOTES_TYPE_PARAMETER = "RELEASE_NOTES_PARAMETER";
     private static final String RELEASE_NOTES_TYPE_CHANGELOG = "RELEASE_NOTES_FROM_CHANGELOG";
     private static final String RELEASE_NOTES_TYPE_NONE = "RELEASE_NOTES_NONE";
 
-    private static final String NOTIFY_TESTERS_TYPE_EMAILS = "NOTIFY_TESTERS_EMAILS";
-    private static final String NOTIFY_TESTERS_TYPE_GROUP = "NOTIFY_TESTERS_GROUP";
     private static final String NOTIFY_TESTERS_TYPE_NONE = "NOTIFY_TESTERS_NONE";
 
     private final String apiKey;
@@ -66,22 +60,40 @@ public class FabricBetaPublisher extends Recorder {
     @Override
     public boolean perform(@Nonnull AbstractBuild<?, ?> build, @Nonnull Launcher launcher, @Nonnull BuildListener listener)
             throws IOException, InterruptedException {
-        FilePath workspace = build.getWorkspace();
-        File manifestFile = getManifestFile(workspace);
-
-        FilePath apkFilePath = new FilePath(workspace, apkPath);
-        File apkFile = new File(apkFilePath.toURI());
-
         PrintStream logger = listener.getLogger();
-        File toolsFile = FileUtils.downloadCrashlyticsTools(workspace, logger);
+        logger.println("Fabric Beta Publisher Plugin:");
+
+        File manifestFile = getManifestFile();
+
+        FilePath apkFilePath = new FilePath(build.getWorkspace(), apkPath);
+        File apkFile;
+        boolean shouldDeleteApk;
+        if (apkFilePath.isRemote()) {
+            apkFile = FileUtils.createTemporaryUploadFile(apkFilePath.read());
+            shouldDeleteApk = true;
+        } else {
+            apkFile = new File(apkFilePath.toURI());
+            shouldDeleteApk = false;
+        }
+
+        File crashlyticsToolsFile;
+        try {
+            crashlyticsToolsFile = downloadCrashlyticsTools(logger);
+        } catch (ZipException e) {
+            logger.println("Error downloading crashlytics-devtools.jar: " + e.getMessage());
+            FileUtils.delete(logger, manifestFile);
+            if (shouldDeleteApk) {
+                FileUtils.delete(logger, apkFile);
+            }
+            return false;
+        }
 
         String releaseNotes = getReleaseNotes(build, listener);
 
-        List<String> command = buildCrashlyticsCommand(manifestFile, apkFile, toolsFile, releaseNotes);
+        List<String> command = buildCrashlyticsCommand(manifestFile, apkFile, crashlyticsToolsFile, releaseNotes);
         logger.println("Executing command: " + command);
 
         Process p = new ProcessBuilder(command).start();
-
         boolean failure = false;
         String s;
         BufferedReader stdError = new BufferedReader(new InputStreamReader(p.getErrorStream(), "UTF-8"));
@@ -90,6 +102,11 @@ public class FabricBetaPublisher extends Recorder {
             failure = true;
         }
         stdError.close();
+
+        FileUtils.delete(logger, manifestFile, crashlyticsToolsFile);
+        if (shouldDeleteApk) {
+            FileUtils.delete(logger, apkFile);
+        }
         return !failure;
     }
 
@@ -160,30 +177,37 @@ public class FabricBetaPublisher extends Recorder {
         return BuildStepMonitor.NONE;
     }
 
+    @SuppressWarnings("unused")
     public String getApiKey() {
         return apiKey;
     }
 
+    @SuppressWarnings("unused")
     public String getBuildSecret() {
         return buildSecret;
     }
 
+    @SuppressWarnings("unused")
     public String getApkPath() {
         return apkPath;
     }
 
+    @SuppressWarnings("unused")
     public boolean isSendNotifications() {
         return !notifyTestersType.equalsIgnoreCase(NOTIFY_TESTERS_TYPE_NONE);
     }
 
+    @SuppressWarnings("unused")
     public String getTestersGroup() {
         return testersGroup;
     }
 
+    @SuppressWarnings("unused")
     public String isReleaseNotesType(String releaseNotesType) {
         return this.releaseNotesType.equalsIgnoreCase(releaseNotesType) ? "true" : "";
     }
 
+    @SuppressWarnings("unused")
     public String isNotifyTestersType(String notifyTestersType) {
         return this.notifyTestersType.equalsIgnoreCase(notifyTestersType) ? "true" : "";
     }
@@ -194,6 +218,7 @@ public class FabricBetaPublisher extends Recorder {
             load();
         }
 
+        @SuppressWarnings("unused")
         public FormValidation doCheckApiKey(@QueryParameter String value)
                 throws IOException, ServletException {
             if (value.length() == 0) {
@@ -202,6 +227,7 @@ public class FabricBetaPublisher extends Recorder {
             return FormValidation.ok();
         }
 
+        @SuppressWarnings("unused")
         public FormValidation doCheckBuildSecret(@QueryParameter String value)
                 throws IOException, ServletException {
             if (value.length() == 0) {
@@ -210,6 +236,7 @@ public class FabricBetaPublisher extends Recorder {
             return FormValidation.ok();
         }
 
+        @SuppressWarnings("unused")
         public FormValidation doCheckApkPath(@QueryParameter String value)
                 throws IOException, ServletException {
             if (value.length() == 0) {

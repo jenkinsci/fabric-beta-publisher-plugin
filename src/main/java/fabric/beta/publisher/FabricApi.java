@@ -5,6 +5,7 @@ import okhttp3.logging.HttpLoggingInterceptor;
 import retrofit2.Retrofit;
 
 import java.io.PrintStream;
+import java.util.concurrent.TimeUnit;
 
 class FabricApi {
     private static FabricService service;
@@ -26,6 +27,9 @@ class FabricApi {
     private static OkHttpClient client(final PrintStream logger) {
         return new OkHttpClient.Builder()
                 .addNetworkInterceptor(interceptor(logger))
+                .readTimeout(60, TimeUnit.SECONDS)
+                .connectTimeout(60, TimeUnit.SECONDS)
+                .writeTimeout(60, TimeUnit.SECONDS)
                 .build();
     }
 
