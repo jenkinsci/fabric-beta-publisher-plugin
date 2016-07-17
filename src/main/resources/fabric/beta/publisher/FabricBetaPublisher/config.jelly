@@ -8,7 +8,7 @@
         <f:textbox/>
     </f:entry>
 
-    <f:entry title=".apk file path" field="apkPath">
+    <f:entry title=".apk file path(s)" field="apkPath">
         <f:textbox default="app/build/outputs/apk/app-debug.apk"/>
     </f:entry>
 

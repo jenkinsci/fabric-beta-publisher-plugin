@@ -65,48 +65,47 @@ public class FabricBetaPublisher extends Recorder {
 
         File manifestFile = getManifestFile();
 
-        FilePath apkFilePath = new FilePath(build.getWorkspace(), apkPath);
-        File apkFile;
-        boolean shouldDeleteApk;
-        if (apkFilePath.isRemote()) {
-            apkFile = FileUtils.createTemporaryUploadFile(apkFilePath.read());
-            shouldDeleteApk = true;
-        } else {
-            apkFile = new File(apkFilePath.toURI());
-            shouldDeleteApk = false;
-        }
-
         File crashlyticsToolsFile;
         try {
             crashlyticsToolsFile = downloadCrashlyticsTools(logger);
         } catch (ZipException e) {
             logger.println("Error downloading crashlytics-devtools.jar: " + e.getMessage());
             FileUtils.delete(logger, manifestFile);
-            if (shouldDeleteApk) {
-                FileUtils.delete(logger, apkFile);
-            }
             return false;
         }
 
         String releaseNotes = getReleaseNotes(build, listener);
 
-        List<String> command = buildCrashlyticsCommand(manifestFile, apkFile, crashlyticsToolsFile, releaseNotes);
-        logger.println("Executing command: " + command);
-
-        Process p = new ProcessBuilder(command).start();
         boolean failure = false;
-        String s;
-        BufferedReader stdError = new BufferedReader(new InputStreamReader(p.getErrorStream(), "UTF-8"));
-        while ((s = stdError.readLine()) != null) {
-            logger.println(s);
-            failure = true;
-        }
-        stdError.close();
+        String[] apkPaths = apkPath.split(",");
+        for (String apkPath : apkPaths) {
+            FilePath apkFilePath = new FilePath(build.getWorkspace(), apkPath.trim());
+            File apkFile;
+            boolean shouldDeleteApk;
+            if (apkFilePath.isRemote()) {
+                apkFile = FileUtils.createTemporaryUploadFile(apkFilePath.read());
+                shouldDeleteApk = true;
+            } else {
+                apkFile = new File(apkFilePath.toURI());
+                shouldDeleteApk = false;
+            }
 
-        FileUtils.delete(logger, manifestFile, crashlyticsToolsFile);
-        if (shouldDeleteApk) {
-            FileUtils.delete(logger, apkFile);
+            List<String> command = buildCrashlyticsCommand(manifestFile, apkFile, crashlyticsToolsFile, releaseNotes);
+            logger.println("Executing command: " + command);
+
+            Process p = new ProcessBuilder(command).start();
+            String s;
+            BufferedReader stdError = new BufferedReader(new InputStreamReader(p.getErrorStream(), "UTF-8"));
+            while ((s = stdError.readLine()) != null) {
+                logger.println(s);
+                failure = true;
+            }
+            stdError.close();
+            if (shouldDeleteApk) {
+                FileUtils.delete(logger, apkFile);
+            }
         }
+        FileUtils.delete(logger, manifestFile, crashlyticsToolsFile);
         return !failure;
     }
 
