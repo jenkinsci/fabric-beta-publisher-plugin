@@ -13,4 +13,4 @@ A Jenkins plugin that lets you publish Android apps to [Fabric Beta](https://doc
 
 ## Screenshot
 
-![screenshot](http://i.imgur.com/YH3fkOA.png)
+![screenshot](http://i.imgur.com/28JtT61.png)
