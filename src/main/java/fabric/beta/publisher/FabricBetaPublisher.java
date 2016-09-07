@@ -3,6 +3,7 @@ package fabric.beta.publisher;
 import hudson.Extension;
 import hudson.FilePath;
 import hudson.Launcher;
+import hudson.Util;
 import hudson.model.AbstractBuild;
 import hudson.model.AbstractProject;
 import hudson.model.BuildListener;
@@ -15,6 +16,8 @@ import hudson.tasks.Recorder;
 import hudson.util.FormValidation;
 import net.lingala.zip4j.exception.ZipException;
 import net.sf.json.JSONObject;
+
+import org.apache.tools.ant.types.FileSet;
 import org.kohsuke.stapler.DataBoundConstructor;
 import org.kohsuke.stapler.QueryParameter;
 import org.kohsuke.stapler.StaplerRequest;
@@ -23,6 +26,7 @@ import javax.annotation.Nonnull;
 import javax.servlet.ServletException;
 import java.io.*;
 import java.util.ArrayList;
+import java.util.Arrays;
 import java.util.List;
 
 import static fabric.beta.publisher.FileUtils.downloadCrashlyticsTools;
@@ -43,10 +47,12 @@ public class FabricBetaPublisher extends Recorder {
     private final String apkPath;
     private final String testersEmails;
     private final String testersGroup;
+    private final boolean useAntStyleInclude;
 
     @DataBoundConstructor
     public FabricBetaPublisher(String apiKey, String buildSecret, String releaseNotesType, String notifyTestersType,
-                               String releaseNotesParameter, String apkPath, String testersEmails, String testersGroup) {
+                               String releaseNotesParameter, String apkPath, String testersEmails, String testersGroup,
+                               boolean useAntStyleInclude) {
         this.apiKey = apiKey;
         this.buildSecret = buildSecret;
         this.releaseNotesType = releaseNotesType == null ? RELEASE_NOTES_TYPE_NONE : releaseNotesType;
@@ -55,6 +61,7 @@ public class FabricBetaPublisher extends Recorder {
         this.testersEmails = testersEmails;
         this.testersGroup = testersGroup;
         this.apkPath = apkPath;
+        this.useAntStyleInclude = useAntStyleInclude;
     }
 
     @Override
@@ -76,10 +83,13 @@ public class FabricBetaPublisher extends Recorder {
 
         String releaseNotes = getReleaseNotes(build, listener);
 
-        boolean failure = false;
-        String[] apkPaths = apkPath.split(",");
-        for (String apkPath : apkPaths) {
-            FilePath apkFilePath = new FilePath(build.getWorkspace(), apkPath.trim());
+        final List<FilePath> apkFilePaths = getAPKFilePaths(build, logger);
+        if (apkFilePaths == null) {
+            return false;
+        }
+
+        boolean failure = apkFilePaths.isEmpty();
+        for (final FilePath apkFilePath : apkFilePaths) {
             File apkFile;
             boolean shouldDeleteApk;
             if (apkFilePath.isRemote()) {
@@ -107,6 +117,19 @@ public class FabricBetaPublisher extends Recorder {
         }
         FileUtils.delete(logger, manifestFile, crashlyticsToolsFile);
         return !failure;
+    }
+
+    private List<FilePath> getAPKFilePaths(final @Nonnull AbstractBuild<?, ?> build, final @Nonnull PrintStream logger) throws IOException, InterruptedException {
+        if (useAntStyleInclude) {
+            final FilePath[] filePaths = build.getWorkspace().list(apkPath);
+            return Arrays.asList(filePaths);
+        } else {
+            final List<FilePath> filePaths = new ArrayList<>();
+            for (String oneApkPath : apkPath.split(",")) {
+                filePaths.add(new FilePath(build.getWorkspace(), oneApkPath.trim()));
+            }
+            return filePaths;
+        }
     }
 
     private String getReleaseNotes(@Nonnull AbstractBuild<?, ?> build, @Nonnull TaskListener listener)
@@ -189,6 +212,11 @@ public class FabricBetaPublisher extends Recorder {
     @SuppressWarnings("unused")
     public String getApkPath() {
         return apkPath;
+    }
+
+    @SuppressWarnings("unused")
+    public boolean isUseAntStyleInclude() {
+        return useAntStyleInclude;
     }
 
     @SuppressWarnings("unused")
