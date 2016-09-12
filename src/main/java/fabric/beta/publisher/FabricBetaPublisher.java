@@ -3,7 +3,6 @@ package fabric.beta.publisher;
 import hudson.Extension;
 import hudson.FilePath;
 import hudson.Launcher;
-import hudson.Util;
 import hudson.model.AbstractBuild;
 import hudson.model.AbstractProject;
 import hudson.model.BuildListener;
@@ -16,8 +15,6 @@ import hudson.tasks.Recorder;
 import hudson.util.FormValidation;
 import net.lingala.zip4j.exception.ZipException;
 import net.sf.json.JSONObject;
-
-import org.apache.tools.ant.types.FileSet;
 import org.kohsuke.stapler.DataBoundConstructor;
 import org.kohsuke.stapler.QueryParameter;
 import org.kohsuke.stapler.StaplerRequest;
@@ -83,11 +80,7 @@ public class FabricBetaPublisher extends Recorder {
 
         String releaseNotes = getReleaseNotes(build, listener);
 
-        final List<FilePath> apkFilePaths = getAPKFilePaths(build, logger);
-        if (apkFilePaths == null) {
-            return false;
-        }
-
+        final List<FilePath> apkFilePaths = getApkFilePaths(build.getWorkspace());
         boolean failure = apkFilePaths.isEmpty();
         for (final FilePath apkFilePath : apkFilePaths) {
             File apkFile;
@@ -119,14 +112,15 @@ public class FabricBetaPublisher extends Recorder {
         return !failure;
     }
 
-    private List<FilePath> getAPKFilePaths(final @Nonnull AbstractBuild<?, ?> build, final @Nonnull PrintStream logger) throws IOException, InterruptedException {
+    private List<FilePath> getApkFilePaths(FilePath workspace)
+            throws IOException, InterruptedException {
         if (useAntStyleInclude) {
-            final FilePath[] filePaths = build.getWorkspace().list(apkPath);
+            final FilePath[] filePaths = workspace.list(apkPath);
             return Arrays.asList(filePaths);
         } else {
             final List<FilePath> filePaths = new ArrayList<>();
             for (String oneApkPath : apkPath.split(",")) {
-                filePaths.add(new FilePath(build.getWorkspace(), oneApkPath.trim()));
+                filePaths.add(new FilePath(workspace, oneApkPath.trim()));
             }
             return filePaths;
         }
