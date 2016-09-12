@@ -12,6 +12,10 @@
         <f:textbox default="app/build/outputs/apk/app-debug.apk"/>
     </f:entry>
 
+    <f:entry title="path as ant-style include" field="useAntStyleInclude">
+        <f:checkbox/>
+    </f:entry>
+
     <f:section title="Notify testers">
         <f:radioBlock name="notifyTestersType" title="Testers group" value="NOTIFY_TESTERS_EMAILS"
                       checked="${instance.isNotifyTestersType('NOTIFY_TESTERS_EMAILS')}" inline="true">
