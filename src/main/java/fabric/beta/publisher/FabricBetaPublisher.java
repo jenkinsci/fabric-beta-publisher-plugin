@@ -6,7 +6,6 @@ import hudson.Launcher;
 import hudson.model.AbstractBuild;
 import hudson.model.AbstractProject;
 import hudson.model.BuildListener;
-import hudson.model.TaskListener;
 import hudson.scm.ChangeLogSet;
 import hudson.tasks.BuildStepDescriptor;
 import hudson.tasks.BuildStepMonitor;
@@ -62,71 +61,84 @@ public class FabricBetaPublisher extends Recorder {
     }
 
     @Override
-    public boolean perform(@Nonnull AbstractBuild<?, ?> build, @Nonnull Launcher launcher, @Nonnull BuildListener listener)
-            throws IOException, InterruptedException {
+    public boolean perform(@Nonnull AbstractBuild<?, ?> build, @Nonnull Launcher launcher,
+                           @Nonnull BuildListener listener) throws IOException, InterruptedException {
         PrintStream logger = listener.getLogger();
         logger.println("Fabric Beta Publisher Plugin:");
 
         File manifestFile = getManifestFile();
 
-        File crashlyticsToolsFile;
-        try {
-            crashlyticsToolsFile = downloadCrashlyticsTools(logger);
-        } catch (ZipException e) {
-            logger.println("Error downloading crashlytics-devtools.jar: " + e.getMessage());
-            FileUtils.delete(logger, manifestFile);
+        File crashlyticsToolsFile = prepareCrashlytics(logger, manifestFile);
+        if (crashlyticsToolsFile == null) {
             return false;
         }
 
         String releaseNotes = getReleaseNotes(build, listener);
 
-        final List<FilePath> apkFilePaths = getApkFilePaths(build.getWorkspace());
+        final List<FilePath> apkFilePaths = getApkFilePaths(build, listener, build.getWorkspace());
         boolean failure = apkFilePaths.isEmpty();
         for (final FilePath apkFilePath : apkFilePaths) {
-            File apkFile;
-            boolean shouldDeleteApk;
-            if (apkFilePath.isRemote()) {
-                apkFile = FileUtils.createTemporaryUploadFile(apkFilePath.read());
-                shouldDeleteApk = true;
-            } else {
-                apkFile = new File(apkFilePath.toURI());
-                shouldDeleteApk = false;
-            }
-
-            List<String> command = buildCrashlyticsCommand(manifestFile, apkFile, crashlyticsToolsFile, releaseNotes);
-            logger.println("Executing command: " + command);
-
-            Process p = new ProcessBuilder(command).start();
-            String s;
-            BufferedReader stdError = new BufferedReader(new InputStreamReader(p.getErrorStream(), "UTF-8"));
-            while ((s = stdError.readLine()) != null) {
-                logger.println(s);
-                failure = true;
-            }
-            stdError.close();
-            if (shouldDeleteApk) {
-                FileUtils.delete(logger, apkFile);
-            }
+            failure = uploadApkFile(build, listener, logger, manifestFile, crashlyticsToolsFile, releaseNotes, failure, apkFilePath);
         }
         FileUtils.delete(logger, manifestFile, crashlyticsToolsFile);
         return !failure;
     }
 
-    private List<FilePath> getApkFilePaths(FilePath workspace)
-            throws IOException, InterruptedException {
+    private boolean uploadApkFile(AbstractBuild<?, ?> build, BuildListener listener, PrintStream logger,
+                                  File manifestFile, File crashlyticsToolsFile, String releaseNotes,
+                                  boolean failure, FilePath apkFilePath) throws IOException, InterruptedException {
+        File apkFile;
+        boolean shouldDeleteApk;
+        if (apkFilePath.isRemote()) {
+            apkFile = FileUtils.createTemporaryUploadFile(apkFilePath.read());
+            shouldDeleteApk = true;
+        } else {
+            apkFile = new File(apkFilePath.toURI());
+            shouldDeleteApk = false;
+        }
+
+        List<String> command = buildCrashlyticsCommand(build, listener, manifestFile, apkFile, crashlyticsToolsFile, releaseNotes);
+        logger.println("Executing command: " + command);
+
+        Process p = new ProcessBuilder(command).start();
+        String s;
+        BufferedReader stdError = new BufferedReader(new InputStreamReader(p.getErrorStream(), "UTF-8"));
+        while ((s = stdError.readLine()) != null) {
+            logger.println(s);
+            failure = true;
+        }
+        stdError.close();
+        if (shouldDeleteApk) {
+            FileUtils.delete(logger, apkFile);
+        }
+        return failure;
+    }
+
+    private File prepareCrashlytics(PrintStream logger, File manifestFile) throws IOException, InterruptedException {
+        try {
+            return downloadCrashlyticsTools(logger);
+        } catch (ZipException e) {
+            logger.println("Error downloading crashlytics-devtools.jar: " + e.getMessage());
+            FileUtils.delete(logger, manifestFile);
+        }
+        return null;
+    }
+
+    private List<FilePath> getApkFilePaths(AbstractBuild<?, ?> build, BuildListener listener,
+                                           FilePath workspace) throws IOException, InterruptedException {
         if (useAntStyleInclude) {
-            final FilePath[] filePaths = workspace.list(apkPath);
+            final FilePath[] filePaths = workspace.list(expand(build, listener, apkPath));
             return Arrays.asList(filePaths);
         } else {
             final List<FilePath> filePaths = new ArrayList<>();
             for (String oneApkPath : apkPath.split(",")) {
-                filePaths.add(new FilePath(workspace, oneApkPath.trim()));
+                filePaths.add(new FilePath(workspace, expand(build, listener, oneApkPath.trim())));
             }
             return filePaths;
         }
     }
 
-    private String getReleaseNotes(@Nonnull AbstractBuild<?, ?> build, @Nonnull TaskListener listener)
+    private String getReleaseNotes(AbstractBuild<?, ?> build, BuildListener listener)
             throws IOException, InterruptedException {
         switch (releaseNotesType) {
             case RELEASE_NOTES_TYPE_NONE:
@@ -151,7 +163,9 @@ public class FabricBetaPublisher extends Recorder {
         }
     }
 
-    private List<String> buildCrashlyticsCommand(File manifestFile, File apkFile, File toolsFile, String releaseNotes) {
+    private List<String> buildCrashlyticsCommand(AbstractBuild<?, ?> build, BuildListener listener,
+                                                 File manifestFile, File apkFile, File toolsFile, String releaseNotes)
+            throws IOException, InterruptedException {
         List<String> command = new ArrayList<>();
         command.add("java");
         command.add("-jar");
@@ -159,28 +173,37 @@ public class FabricBetaPublisher extends Recorder {
         command.add("-androidRes");
         command.add(".");
         command.add("-apiKey");
-        command.add(apiKey);
+        command.add(expand(build, listener, apiKey));
         command.add("-apiSecret");
-        command.add(buildSecret);
+        command.add(expand(build, listener, buildSecret));
         command.add("-androidManifest");
         command.add(manifestFile.getPath());
         command.add("-uploadDist");
         command.add(apkFile.getPath());
         command.add("-betaDistributionNotifications");
-        command.add(String.valueOf(isSendNotifications()));
+        command.add(String.valueOf(shouldSendNotifications()));
         if (testersEmails != null && !testersEmails.isEmpty()) {
             command.add("-betaDistributionEmails");
-            command.add(testersEmails);
+            command.add(expand(build, listener, testersEmails));
         }
         if (testersGroup != null && !testersGroup.isEmpty()) {
             command.add("-betaDistributionGroupAliases");
-            command.add(testersGroup);
+            command.add(expand(build, listener, testersGroup));
         }
         if (releaseNotes != null && !releaseNotes.isEmpty()) {
             command.add("-betaDistributionReleaseNotes");
             command.add(releaseNotes);
         }
         return command;
+    }
+
+    private String expand(AbstractBuild<?, ?> build, BuildListener listener, String s)
+            throws IOException, InterruptedException {
+        return build.getEnvironment(listener).expand(s);
+    }
+
+    private boolean shouldSendNotifications() {
+        return !notifyTestersType.equalsIgnoreCase(NOTIFY_TESTERS_TYPE_NONE);
     }
 
     @Override
@@ -211,11 +234,6 @@ public class FabricBetaPublisher extends Recorder {
     @SuppressWarnings("unused")
     public boolean isUseAntStyleInclude() {
         return useAntStyleInclude;
-    }
-
-    @SuppressWarnings("unused")
-    public boolean isSendNotifications() {
-        return !notifyTestersType.equalsIgnoreCase(NOTIFY_TESTERS_TYPE_NONE);
     }
 
     @SuppressWarnings("unused")

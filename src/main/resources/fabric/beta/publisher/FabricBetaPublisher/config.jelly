@@ -35,7 +35,7 @@
             </f:nested>
         </f:radioBlock>
 
-        <f:radioBlock name="notifyTestersType" title="Don't notify testers" value="NOTIFY_TESTERS_GROUP"
+        <f:radioBlock name="notifyTestersType" title="Don't notify testers" value="NOTIFY_TESTERS_NONE"
                       checked="${instance.isNotifyTestersType('NOTIFY_TESTERS_NONE')}" inline="true"/>
     </f:section>
 
