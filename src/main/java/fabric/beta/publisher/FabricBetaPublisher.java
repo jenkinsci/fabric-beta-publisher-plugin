@@ -181,7 +181,7 @@ public class FabricBetaPublisher extends Recorder {
         command.add("-uploadDist");
         command.add(apkFile.getPath());
         command.add("-betaDistributionNotifications");
-        command.add(String.valueOf(isSendNotifications()));
+        command.add(String.valueOf(shouldSendNotifications()));
         if (testersEmails != null && !testersEmails.isEmpty()) {
             command.add("-betaDistributionEmails");
             command.add(expand(build, listener, testersEmails));
@@ -200,6 +200,10 @@ public class FabricBetaPublisher extends Recorder {
     private String expand(AbstractBuild<?, ?> build, BuildListener listener, String s)
             throws IOException, InterruptedException {
         return build.getEnvironment(listener).expand(s);
+    }
+
+    private boolean shouldSendNotifications() {
+        return !notifyTestersType.equalsIgnoreCase(NOTIFY_TESTERS_TYPE_NONE);
     }
 
     @Override
@@ -230,11 +234,6 @@ public class FabricBetaPublisher extends Recorder {
     @SuppressWarnings("unused")
     public boolean isUseAntStyleInclude() {
         return useAntStyleInclude;
-    }
-
-    @SuppressWarnings("unused")
-    public boolean isSendNotifications() {
-        return !notifyTestersType.equalsIgnoreCase(NOTIFY_TESTERS_TYPE_NONE);
     }
 
     @SuppressWarnings("unused")
