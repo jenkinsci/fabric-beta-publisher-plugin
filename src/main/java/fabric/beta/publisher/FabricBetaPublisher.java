@@ -168,6 +168,27 @@ public class FabricBetaPublisher extends Recorder {
             throws IOException, InterruptedException {
         List<String> command = new ArrayList<>();
         command.add("java");
+
+        if (System.getProperty("http.nonProxyHosts") != null) {
+            command.add("-Dhttp.nonProxyHosts=\"" + System.getProperty("http.nonProxyHosts") + "\"");
+        }
+
+        if (System.getProperty("http.proxyHost") != null) {
+            command.add("-Dhttp.proxyHost=" + System.getProperty("http.proxyHost"));
+        }
+
+        if (System.getProperty("http.proxyPort") != null) {
+            command.add("-Dhttp.proxyPort=" + System.getProperty("http.proxyPort"));
+        }
+
+        if (System.getProperty("https.proxyHost") != null) {
+            command.add("-Dhttps.proxyHost=" + System.getProperty("https.proxyHost"));
+        }
+
+        if (System.getProperty("https.proxyPort") != null) {
+            command.add("-Dhttps.proxyPort=" + System.getProperty("https.proxyPort"));
+        }
+
         command.add("-jar");
         command.add(toolsFile.getPath());
         command.add("-androidRes");
