@@ -165,7 +165,8 @@ public class FabricBetaPublisher extends Recorder {
                 return sb.toString();
             case RELEASE_NOTES_TYPE_FILE:
                 String releaseNotesFilePath = expand(build, listener, releaseNotesFile);
-                return new String(Files.readAllBytes(Paths.get(releaseNotesFilePath)));
+                byte[] fileContent = Files.readAllBytes(Paths.get(releaseNotesFilePath));
+                return new String(fileContent, "UTF-8");
             default:
                 return null;
         }
