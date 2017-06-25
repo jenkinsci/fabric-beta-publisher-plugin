@@ -34,6 +34,8 @@ public class FabricBetaPublisher extends Recorder {
     private static final String RELEASE_NOTES_TYPE_NONE = "RELEASE_NOTES_NONE";
 
     private static final String NOTIFY_TESTERS_TYPE_NONE = "NOTIFY_TESTERS_NONE";
+    private static final String NOTIFY_TESTERS_TYPE_EMAILS = "NOTIFY_TESTERS_EMAILS";
+    private static final String NOTIFY_TESTERS_GROUP = "NOTIFY_TESTERS_GROUP";
 
     private final String apiKey;
     private final String buildSecret;
@@ -203,11 +205,11 @@ public class FabricBetaPublisher extends Recorder {
         command.add(apkFile.getPath());
         command.add("-betaDistributionNotifications");
         command.add(String.valueOf(shouldSendNotifications()));
-        if (testersEmails != null && !testersEmails.isEmpty()) {
+        if (NOTIFY_TESTERS_TYPE_EMAILS.equals(notifyTestersType) && testersEmails != null && !testersEmails.isEmpty()) {
             command.add("-betaDistributionEmails");
             command.add(expand(build, listener, testersEmails));
         }
-        if (testersGroup != null && !testersGroup.isEmpty()) {
+        if (NOTIFY_TESTERS_GROUP.equals(notifyTestersType) && testersGroup != null && !testersGroup.isEmpty()) {
             command.add("-betaDistributionGroupAliases");
             command.add(expand(build, listener, testersGroup));
         }
