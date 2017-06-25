@@ -17,8 +17,8 @@
     </f:entry>
 
     <f:section title="Notify testers">
-        <f:radioBlock name="notifyTestersType" title="Testers group" value="NOTIFY_TESTERS_EMAILS"
-                      checked="${instance.isNotifyTestersType('NOTIFY_TESTERS_EMAILS')}" inline="true">
+        <f:radioBlock name="notifyTestersType" title="Testers group" value="NOTIFY_TESTERS_GROUP"
+                      checked="${instance.isNotifyTestersType('NOTIFY_TESTERS_GROUP')}" inline="true">
             <f:nested>
                 <f:entry title="Group name" field="testersGroup">
                     <f:textbox/>
@@ -26,8 +26,8 @@
             </f:nested>
         </f:radioBlock>
 
-        <f:radioBlock name="notifyTestersType" title="Testers e-mails" value="NOTIFY_TESTERS_GROUP"
-                      checked="${instance.isNotifyTestersType('NOTIFY_TESTERS_GROUP')}" inline="true">
+        <f:radioBlock name="notifyTestersType" title="Testers e-mails" value="NOTIFY_TESTERS_EMAILS"
+                      checked="${instance.isNotifyTestersType('NOTIFY_TESTERS_EMAILS')}" inline="true">
             <f:nested>
                 <f:entry title="E-mails (comma separated)" field="testersEmails">
                     <f:textbox/>

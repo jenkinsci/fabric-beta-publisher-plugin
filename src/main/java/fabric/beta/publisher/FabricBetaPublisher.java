@@ -263,6 +263,11 @@ public class FabricBetaPublisher extends Recorder {
     }
 
     @SuppressWarnings("unused")
+    public String getTestersEmails() {
+        return testersEmails;
+    }
+
+    @SuppressWarnings("unused")
     public String isReleaseNotesType(String releaseNotesType) {
         return this.releaseNotesType.equalsIgnoreCase(releaseNotesType) ? "true" : "";
     }
