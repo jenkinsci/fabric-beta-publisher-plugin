@@ -21,6 +21,8 @@ import org.kohsuke.stapler.StaplerRequest;
 import javax.annotation.Nonnull;
 import javax.servlet.ServletException;
 import java.io.*;
+import java.nio.file.Files;
+import java.nio.file.Paths;
 import java.util.ArrayList;
 import java.util.Arrays;
 import java.util.List;
@@ -29,6 +31,7 @@ import static fabric.beta.publisher.FileUtils.downloadCrashlyticsTools;
 import static fabric.beta.publisher.FileUtils.getManifestFile;
 
 public class FabricBetaPublisher extends Recorder {
+    private static final String RELEASE_NOTES_TYPE_FILE = "RELEASE_NOTES_FILE";
     private static final String RELEASE_NOTES_TYPE_PARAMETER = "RELEASE_NOTES_PARAMETER";
     private static final String RELEASE_NOTES_TYPE_CHANGELOG = "RELEASE_NOTES_FROM_CHANGELOG";
     private static final String RELEASE_NOTES_TYPE_NONE = "RELEASE_NOTES_NONE";
@@ -42,6 +45,7 @@ public class FabricBetaPublisher extends Recorder {
     private final String releaseNotesType;
     private final String notifyTestersType;
     private final String releaseNotesParameter;
+    private final String releaseNotesFile;
     private final String apkPath;
     private final String testersEmails;
     private final String testersGroup;
@@ -49,13 +53,14 @@ public class FabricBetaPublisher extends Recorder {
 
     @DataBoundConstructor
     public FabricBetaPublisher(String apiKey, String buildSecret, String releaseNotesType, String notifyTestersType,
-                               String releaseNotesParameter, String apkPath, String testersEmails, String testersGroup,
-                               boolean useAntStyleInclude) {
+                               String releaseNotesParameter, String releaseNotesFile, String apkPath,
+                               String testersEmails, String testersGroup, boolean useAntStyleInclude) {
         this.apiKey = apiKey;
         this.buildSecret = buildSecret;
         this.releaseNotesType = releaseNotesType == null ? RELEASE_NOTES_TYPE_NONE : releaseNotesType;
         this.notifyTestersType = notifyTestersType == null ? NOTIFY_TESTERS_TYPE_NONE : notifyTestersType;
         this.releaseNotesParameter = releaseNotesParameter;
+        this.releaseNotesFile = releaseNotesFile;
         this.testersEmails = testersEmails;
         this.testersGroup = testersGroup;
         this.apkPath = apkPath;
@@ -160,6 +165,10 @@ public class FabricBetaPublisher extends Recorder {
                     }
                 }
                 return sb.toString();
+            case RELEASE_NOTES_TYPE_FILE:
+                String releaseNotesFilePath = expand(build, listener, releaseNotesFile);
+                byte[] fileContent = Files.readAllBytes(Paths.get(releaseNotesFilePath));
+                return new String(fileContent, "UTF-8");
             default:
                 return null;
         }

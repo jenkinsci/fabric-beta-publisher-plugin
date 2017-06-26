@@ -52,6 +52,15 @@
             </f:nested>
         </f:radioBlock>
 
+        <f:radioBlock name="releaseNotesType" title="From file" value="RELEASE_NOTES_FILE"
+                      checked="${instance.isReleaseNotesType('RELEASE_NOTES_FILE')}" inline="true">
+            <f:nested>
+                <f:entry title="Changelog file path" field="releaseNotesFile">
+                    <f:textbox default="$WORKSPACE/release_notes.txt"/>
+                </f:entry>
+            </f:nested>
+        </f:radioBlock>
+
         <f:radioBlock name="releaseNotesType" title="No release notes" value="RELEASE_NOTES_NONE"
                       checked="${instance.isReleaseNotesType('RELEASE_NOTES_NONE')}" inline="true"/>
     </f:section>
