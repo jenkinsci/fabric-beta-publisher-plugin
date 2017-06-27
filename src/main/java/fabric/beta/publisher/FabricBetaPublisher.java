@@ -28,6 +28,9 @@ import hudson.Launcher;
 import hudson.model.AbstractBuild;
 import hudson.model.AbstractProject;
 import hudson.model.BuildListener;
+import hudson.model.Item;
+import hudson.model.ItemGroup;
+import hudson.model.Job;
 import hudson.model.Run;
 import hudson.model.TaskListener;
 import hudson.scm.ChangeLogSet;
@@ -90,7 +93,7 @@ public class FabricBetaPublisher extends Recorder implements SimpleBuildStep {
     public void perform(Run build, FilePath workspace, Launcher launcher,
                         TaskListener listener) throws InterruptedException, IOException {
         PrintStream logger = listener.getLogger();
-        ChangeLogSet<? extends ChangeLogSet.Entry> changeLogSet = ChangeLogSet.createEmpty(build); // TODO Find a way to get the changelog through Run instead of AbstractBuild
+        ChangeLogSet<? extends ChangeLogSet.Entry> changeLogSet = getChangeLogSetFromRun(build, logger);
         publishFabric(build.getEnvironment(listener), workspace, logger, changeLogSet);
     }
 
@@ -114,6 +117,24 @@ public class FabricBetaPublisher extends Recorder implements SimpleBuildStep {
         }
         FileUtils.delete(logger, manifestFile, crashlyticsToolsFile);
         return !failure;
+    }
+
+    private ChangeLogSet<? extends ChangeLogSet.Entry> getChangeLogSetFromRun(Run<?, ?> build, PrintStream logger) {
+        ItemGroup<?> itemGroup = build.getParent().getParent();
+        for (Item item : itemGroup.getItems()) {
+            if (!item.getFullDisplayName().equals(build.getFullDisplayName())
+                    && !item.getFullDisplayName().equals(build.getParent().getFullDisplayName())) {
+                continue;
+            }
+
+            for (Job<?, ?> job : item.getAllJobs()) {
+                if (job instanceof AbstractProject<?, ?>) {
+                    AbstractProject<?, ?> project = (AbstractProject<?, ?>) job;
+                    return project.getBuilds().getLastBuild().getChangeSet();
+                }
+            }
+        }
+        return ChangeLogSet.createEmpty(build);
     }
 
     private boolean uploadApkFile(EnvVars environment, PrintStream logger,
