@@ -93,7 +93,7 @@ public class FabricBetaPublisher extends Recorder implements SimpleBuildStep {
     public void perform(Run build, FilePath workspace, Launcher launcher,
                         TaskListener listener) throws InterruptedException, IOException {
         PrintStream logger = listener.getLogger();
-        ChangeLogSet<? extends ChangeLogSet.Entry> changeLogSet = getChangeLogSetFromRun(build, logger);
+        ChangeLogSet<? extends ChangeLogSet.Entry> changeLogSet = getChangeLogSetFromRun(build);
         publishFabric(build.getEnvironment(listener), workspace, logger, changeLogSet);
     }
 
@@ -119,7 +119,7 @@ public class FabricBetaPublisher extends Recorder implements SimpleBuildStep {
         return !failure;
     }
 
-    private ChangeLogSet<? extends ChangeLogSet.Entry> getChangeLogSetFromRun(Run<?, ?> build, PrintStream logger) {
+    private ChangeLogSet<? extends ChangeLogSet.Entry> getChangeLogSetFromRun(Run<?, ?> build) {
         ItemGroup<?> itemGroup = build.getParent().getParent();
         for (Item item : itemGroup.getItems()) {
             if (!item.getFullDisplayName().equals(build.getFullDisplayName())
