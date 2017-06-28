@@ -31,6 +31,7 @@ import hudson.model.BuildListener;
 import hudson.model.Item;
 import hudson.model.ItemGroup;
 import hudson.model.Job;
+import hudson.model.Result;
 import hudson.model.Run;
 import hudson.model.TaskListener;
 import hudson.scm.ChangeLogSet;
@@ -94,7 +95,9 @@ public class FabricBetaPublisher extends Recorder implements SimpleBuildStep {
                         TaskListener listener) throws InterruptedException, IOException {
         PrintStream logger = listener.getLogger();
         ChangeLogSet<? extends ChangeLogSet.Entry> changeLogSet = getChangeLogSetFromRun(build);
-        publishFabric(build.getEnvironment(listener), workspace, logger, changeLogSet);
+        if (!publishFabric(build.getEnvironment(listener), workspace, logger, changeLogSet)) {
+            build.setResult(Result.FAILURE);
+        }
     }
 
     private boolean publishFabric(EnvVars environment, FilePath workspace, PrintStream logger,
@@ -331,6 +334,26 @@ public class FabricBetaPublisher extends Recorder implements SimpleBuildStep {
     @SuppressWarnings("unused")
     public String isNotifyTestersType(String notifyTestersType) {
         return this.notifyTestersType.equalsIgnoreCase(notifyTestersType) ? "true" : "";
+    }
+
+    @SuppressWarnings("unused")
+    public String getReleaseNotesType() {
+        return releaseNotesType;
+    }
+
+    @SuppressWarnings("unused")
+    public String getNotifyTestersType() {
+        return notifyTestersType;
+    }
+
+    @SuppressWarnings("unused")
+    public String getReleaseNotesParameter() {
+        return releaseNotesParameter;
+    }
+
+    @SuppressWarnings("unused")
+    public String getReleaseNotesFile() {
+        return releaseNotesFile;
     }
 
     @Extension
