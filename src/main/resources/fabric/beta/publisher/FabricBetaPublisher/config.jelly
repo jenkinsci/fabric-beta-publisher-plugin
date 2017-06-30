@@ -7,6 +7,9 @@
     <f:entry title="Fabric build secret" field="buildSecret">
         <f:textbox/>
     </f:entry>
+    <f:entry title="Fabric Organization name" field="organization">
+        <f:textbox/>
+    </f:entry>
 
     <f:entry title=".apk file path(s)" field="apkPath">
         <f:textbox default="app/build/outputs/apk/app-debug.apk"/>

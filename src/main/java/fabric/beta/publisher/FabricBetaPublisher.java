@@ -1,5 +1,7 @@
 package fabric.beta.publisher;
 
+import com.google.common.base.Strings;
+import hudson.model.*;
 import net.lingala.zip4j.exception.ZipException;
 import net.sf.json.JSONObject;
 
@@ -7,16 +9,10 @@ import org.kohsuke.stapler.DataBoundConstructor;
 import org.kohsuke.stapler.QueryParameter;
 import org.kohsuke.stapler.StaplerRequest;
 
-import java.io.BufferedReader;
-import java.io.File;
-import java.io.IOException;
-import java.io.InputStreamReader;
-import java.io.PrintStream;
+import java.io.*;
 import java.nio.file.Files;
 import java.nio.file.Paths;
-import java.util.ArrayList;
-import java.util.Arrays;
-import java.util.List;
+import java.util.*;
 
 import javax.annotation.Nonnull;
 import javax.servlet.ServletException;
@@ -25,15 +21,6 @@ import hudson.EnvVars;
 import hudson.Extension;
 import hudson.FilePath;
 import hudson.Launcher;
-import hudson.model.AbstractBuild;
-import hudson.model.AbstractProject;
-import hudson.model.BuildListener;
-import hudson.model.Item;
-import hudson.model.ItemGroup;
-import hudson.model.Job;
-import hudson.model.Result;
-import hudson.model.Run;
-import hudson.model.TaskListener;
 import hudson.scm.ChangeLogSet;
 import hudson.tasks.BuildStepDescriptor;
 import hudson.tasks.BuildStepMonitor;
@@ -64,12 +51,14 @@ public class FabricBetaPublisher extends Recorder implements SimpleBuildStep {
     private final String apkPath;
     private final String testersEmails;
     private final String testersGroup;
+    private final String organization;
     private final boolean useAntStyleInclude;
 
     @DataBoundConstructor
     public FabricBetaPublisher(String apiKey, String buildSecret, String releaseNotesType, String notifyTestersType,
                                String releaseNotesParameter, String releaseNotesFile, String apkPath,
-                               String testersEmails, String testersGroup, boolean useAntStyleInclude) {
+                               String testersEmails, String testersGroup, String organization,
+                               boolean useAntStyleInclude) {
         this.apiKey = apiKey;
         this.buildSecret = buildSecret;
         this.releaseNotesType = releaseNotesType == null ? RELEASE_NOTES_TYPE_NONE : releaseNotesType;
@@ -78,6 +67,7 @@ public class FabricBetaPublisher extends Recorder implements SimpleBuildStep {
         this.releaseNotesFile = releaseNotesFile;
         this.testersEmails = testersEmails;
         this.testersGroup = testersGroup;
+        this.organization = organization;
         this.apkPath = apkPath;
         this.useAntStyleInclude = useAntStyleInclude;
     }
@@ -87,21 +77,22 @@ public class FabricBetaPublisher extends Recorder implements SimpleBuildStep {
                            @Nonnull BuildListener listener) throws IOException, InterruptedException {
         PrintStream logger = listener.getLogger();
         ChangeLogSet<? extends ChangeLogSet.Entry> changeLogSet = build.getChangeSet();
-        return publishFabric(build.getEnvironment(listener), build.getWorkspace(), logger, changeLogSet);
+        return publishFabric(build, build.getEnvironment(listener), build.getWorkspace(), logger, changeLogSet);
     }
 
     @Override
-    public void perform(Run build, FilePath workspace, Launcher launcher,
-                        TaskListener listener) throws InterruptedException, IOException {
+    public void perform(@Nonnull Run build, @Nonnull FilePath workspace, @Nonnull Launcher launcher,
+                        @Nonnull TaskListener listener) throws InterruptedException, IOException {
         PrintStream logger = listener.getLogger();
         ChangeLogSet<? extends ChangeLogSet.Entry> changeLogSet = getChangeLogSetFromRun(build);
-        if (!publishFabric(build.getEnvironment(listener), workspace, logger, changeLogSet)) {
+        if (!publishFabric(build, build.getEnvironment(listener), workspace, logger, changeLogSet)) {
             build.setResult(Result.FAILURE);
         }
     }
 
-    private boolean publishFabric(EnvVars environment, FilePath workspace, PrintStream logger,
-                                  ChangeLogSet<? extends ChangeLogSet.Entry> changeLogSet) throws InterruptedException, IOException {
+    private boolean publishFabric(Run build, EnvVars environment, FilePath workspace, PrintStream logger,
+                                  ChangeLogSet<? extends ChangeLogSet.Entry> changeLogSet)
+            throws InterruptedException, IOException {
         logger.println("Fabric Beta Publisher Plugin:");
 
         File manifestFile = getManifestFile();
@@ -115,8 +106,9 @@ public class FabricBetaPublisher extends Recorder implements SimpleBuildStep {
 
         final List<FilePath> apkFilePaths = getApkFilePaths(environment, workspace);
         boolean failure = apkFilePaths.isEmpty();
-        for (final FilePath apkFilePath : apkFilePaths) {
-            failure = uploadApkFile(environment, logger, manifestFile, crashlyticsToolsFile, releaseNotes, failure, apkFilePath);
+        for (int apkIndex = 0; apkIndex < apkFilePaths.size(); apkIndex++) {
+            failure = uploadApkFile(build, apkIndex, environment, logger, manifestFile, crashlyticsToolsFile,
+                    releaseNotes, failure, apkFilePaths.get(apkIndex));
         }
         FileUtils.delete(logger, manifestFile, crashlyticsToolsFile);
         return !failure;
@@ -140,7 +132,7 @@ public class FabricBetaPublisher extends Recorder implements SimpleBuildStep {
         return ChangeLogSet.createEmpty(build);
     }
 
-    private boolean uploadApkFile(EnvVars environment, PrintStream logger,
+    private boolean uploadApkFile(Run build, int apkIndex, EnvVars environment, PrintStream logger,
                                   File manifestFile, File crashlyticsToolsFile, String releaseNotes,
                                   boolean failure, FilePath apkFilePath) throws IOException, InterruptedException {
         File apkFile;
@@ -151,6 +143,22 @@ public class FabricBetaPublisher extends Recorder implements SimpleBuildStep {
         } else {
             apkFile = new File(apkFilePath.toURI());
             shouldDeleteApk = false;
+        }
+
+        if (!Strings.isNullOrEmpty(organization)) {
+            try {
+                AppRelease appRelease = FileUtils.readBuildProperties(apkFile);
+                if (appRelease == null) {
+                    throw new InterruptedIOException("Could not read APK properties for apk " + apkFile);
+                } else {
+                    saveBuildLinks(logger, build, apkIndex, appRelease.buildLink(organization));
+                }
+            } catch (ZipException e) {
+                e.printStackTrace();
+                failure = true;
+            }
+        } else {
+            logger.println("Skipped constructing Fabric Beta link because organization is not set.");
         }
 
         List<String> command = buildCrashlyticsCommand(environment, manifestFile, apkFile, crashlyticsToolsFile, releaseNotes);
@@ -168,6 +176,16 @@ public class FabricBetaPublisher extends Recorder implements SimpleBuildStep {
             FileUtils.delete(logger, apkFile);
         }
         return failure;
+    }
+
+    private void saveBuildLinks(PrintStream logger, Run build, int apkIndex, String buildUrl)
+            throws IOException, InterruptedException {
+        EnvVarsAction envData = new EnvVarsAction();
+        if (apkIndex == 0) {
+            envData.add(logger, "FABRIC_BETA_INSTALL_URL", buildUrl);
+        }
+        envData.add(logger, "FABRIC_BETA_BUILD_URL_" + apkIndex, buildUrl);
+        build.addAction(envData);
     }
 
     private File prepareCrashlytics(PrintStream logger, File manifestFile) throws IOException, InterruptedException {
@@ -319,6 +337,11 @@ public class FabricBetaPublisher extends Recorder implements SimpleBuildStep {
     @SuppressWarnings("unused")
     public String getTestersGroup() {
         return testersGroup;
+    }
+
+    @SuppressWarnings("unused")
+    public String getOrganization() {
+        return organization;
     }
 
     @SuppressWarnings("unused")
