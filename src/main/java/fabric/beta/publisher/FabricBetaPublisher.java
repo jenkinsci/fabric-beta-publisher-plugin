@@ -28,19 +28,19 @@ import java.util.ArrayList;
 import java.util.Arrays;
 import java.util.List;
 
+import static fabric.beta.publisher.ChangelogReader.getChangeLogSetFromRun;
 import static fabric.beta.publisher.FileUtils.downloadCrashlyticsTools;
 import static fabric.beta.publisher.FileUtils.getManifestFile;
 
 public class FabricBetaPublisher extends Recorder implements SimpleBuildStep {
+    public static final String ENV_VAR_BUILD_URL = "FABRIC_BETA_BUILD_URL";
     private static final String RELEASE_NOTES_TYPE_FILE = "RELEASE_NOTES_FILE";
     private static final String RELEASE_NOTES_TYPE_PARAMETER = "RELEASE_NOTES_PARAMETER";
     private static final String RELEASE_NOTES_TYPE_CHANGELOG = "RELEASE_NOTES_FROM_CHANGELOG";
     private static final String RELEASE_NOTES_TYPE_NONE = "RELEASE_NOTES_NONE";
-
     private static final String NOTIFY_TESTERS_TYPE_NONE = "NOTIFY_TESTERS_NONE";
     private static final String NOTIFY_TESTERS_TYPE_EMAILS = "NOTIFY_TESTERS_EMAILS";
     private static final String NOTIFY_TESTERS_GROUP = "NOTIFY_TESTERS_GROUP";
-
     private final String apiKey;
     private final String buildSecret;
     private final String releaseNotesType;
@@ -118,24 +118,6 @@ public class FabricBetaPublisher extends Recorder implements SimpleBuildStep {
         return !failure;
     }
 
-    private ChangeLogSet<? extends ChangeLogSet.Entry> getChangeLogSetFromRun(Run<?, ?> build) {
-        ItemGroup<?> itemGroup = build.getParent().getParent();
-        for (Item item : itemGroup.getItems()) {
-            if (!item.getFullDisplayName().equals(build.getFullDisplayName())
-                    && !item.getFullDisplayName().equals(build.getParent().getFullDisplayName())) {
-                continue;
-            }
-
-            for (Job<?, ?> job : item.getAllJobs()) {
-                if (job instanceof AbstractProject<?, ?>) {
-                    AbstractProject<?, ?> project = (AbstractProject<?, ?>) job;
-                    return project.getBuilds().getLastBuild().getChangeSet();
-                }
-            }
-        }
-        return ChangeLogSet.createEmpty(build);
-    }
-
     private boolean uploadApkFile(Run build, int apkIndex, EnvVars environment, PrintStream logger,
                                   File manifestFile, File crashlyticsToolsFile, String releaseNotes,
                                   boolean failure, FilePath apkFilePath) throws IOException, InterruptedException {
@@ -151,7 +133,7 @@ public class FabricBetaPublisher extends Recorder implements SimpleBuildStep {
 
         if (!Strings.isNullOrEmpty(organization)) {
             try {
-                AppRelease appRelease = FileUtils.readBuildProperties(apkFile);
+                AppRelease appRelease = AppRelease.from(apkFile);
                 if (appRelease == null) {
                     throw new InterruptedIOException("Could not read APK properties for apk " + apkFile);
                 } else {
@@ -186,9 +168,9 @@ public class FabricBetaPublisher extends Recorder implements SimpleBuildStep {
             throws IOException, InterruptedException {
         EnvVarsAction envData = new EnvVarsAction();
         if (apkIndex == 0) {
-            envData.add(logger, "FABRIC_BETA_BUILD_URL", buildUrl);
+            envData.add(logger, ENV_VAR_BUILD_URL, buildUrl);
         }
-        envData.add(logger, "FABRIC_BETA_BUILD_URL_" + apkIndex, buildUrl);
+        envData.add(logger, ENV_VAR_BUILD_URL + "_" + apkIndex, buildUrl);
         build.addAction(envData);
     }
 
