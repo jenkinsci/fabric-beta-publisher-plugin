@@ -79,7 +79,8 @@ public class FabricBetaPublisher extends Recorder implements SimpleBuildStep {
     public boolean perform(@Nonnull AbstractBuild<?, ?> build, @Nonnull Launcher launcher,
                            @Nonnull BuildListener listener) throws IOException, InterruptedException {
         PrintStream logger = listener.getLogger();
-        if (build.getResult().isWorseOrEqualTo(Result.FAILURE)) {
+        Result result = build.getResult();
+        if (result != null && result.isWorseOrEqualTo(Result.FAILURE)) {
             logger.println("Aborting Fabric Beta upload since build has failed.");
             return false;
         }
@@ -90,7 +91,8 @@ public class FabricBetaPublisher extends Recorder implements SimpleBuildStep {
     public void perform(@Nonnull Run build, @Nonnull FilePath workspace, @Nonnull Launcher launcher,
                         @Nonnull TaskListener listener) throws InterruptedException, IOException {
         PrintStream logger = listener.getLogger();
-        if (build.getResult() != null && build.getResult().isWorseOrEqualTo(Result.FAILURE)) {
+        Result result = build.getResult();
+        if (result != null && result.isWorseOrEqualTo(Result.FAILURE)) {
             logger.println("Aborting Fabric Beta upload since build has failed.");
             build.setResult(Result.FAILURE);
             return;
