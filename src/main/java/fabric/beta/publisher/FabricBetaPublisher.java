@@ -119,11 +119,21 @@ public class FabricBetaPublisher extends Recorder implements SimpleBuildStep {
         String releaseNotes = getReleaseNotes(
                 changeLogSet, releaseNotesType, releaseNotesParameter, releaseNotesFile, environment);
 
+        EnvVarsAction envVarsAction = null;
+        if (!Strings.isNullOrEmpty(organization)) {
+            envVarsAction = new EnvVarsAction();
+        } else {
+            logger.println("Skipped constructing Fabric Beta link because organization is not set.");
+        }
+
         List<FilePath> apkFilePaths = getApkFilePaths(environment, workspace);
         boolean success = !apkFilePaths.isEmpty();
         for (int apkIndex = 0; apkIndex < apkFilePaths.size(); apkIndex++) {
-            success &= uploadApkFile(build, apkIndex, environment, logger, manifestFile, crashlyticsToolsFile,
+            success &= uploadApkFile(envVarsAction, apkIndex, environment, logger, manifestFile, crashlyticsToolsFile,
                     releaseNotes, apkFilePaths.get(apkIndex));
+        }
+        if (envVarsAction != null) {
+            build.addAction(envVarsAction);
         }
         FileUtils.delete(logger, manifestFile, crashlyticsToolsFile);
         return success;
@@ -132,8 +142,8 @@ public class FabricBetaPublisher extends Recorder implements SimpleBuildStep {
     /**
      * @return true if APK file has been uploaded successfuly.
      */
-    private boolean uploadApkFile(Run build, int apkIndex, EnvVars environment, PrintStream logger,
-                                  File manifestFile, File crashlyticsToolsFile, String releaseNotes,
+    private boolean uploadApkFile(EnvVarsAction envVarsAction, int apkIndex, EnvVars environment,
+                                  PrintStream logger, File manifestFile, File crashlyticsToolsFile, String releaseNotes,
                                   FilePath apkFilePath) throws IOException, InterruptedException {
         File apkFile;
         boolean shouldDeleteApk;
@@ -145,19 +155,15 @@ public class FabricBetaPublisher extends Recorder implements SimpleBuildStep {
             shouldDeleteApk = false;
         }
 
-        if (!Strings.isNullOrEmpty(organization)) {
-            try {
-                AppRelease appRelease = AppRelease.from(apkFile);
-                if (appRelease == null) {
-                    throw new InterruptedIOException("Could not read APK properties for apk " + apkFile);
-                } else {
-                    saveBuildLinks(logger, build, apkIndex, appRelease.buildLink(organization));
-                }
-            } catch (ZipException e) {
-                e.printStackTrace();
+        try {
+            AppRelease appRelease = AppRelease.from(apkFile);
+            if (appRelease == null) {
+                throw new InterruptedIOException("Could not read APK properties for apk " + apkFile);
+            } else {
+                saveBuildLinks(logger, envVarsAction, apkIndex, appRelease.buildLink(organization));
             }
-        } else {
-            logger.println("Skipped constructing Fabric Beta link because organization is not set.");
+        } catch (ZipException e) {
+            e.printStackTrace();
         }
 
         List<String> command = buildCrashlyticsCommand(environment, manifestFile, apkFile, crashlyticsToolsFile, releaseNotes);
@@ -168,14 +174,12 @@ public class FabricBetaPublisher extends Recorder implements SimpleBuildStep {
         return success;
     }
 
-    private void saveBuildLinks(PrintStream logger, Run build, int apkIndex, String buildUrl)
+    private void saveBuildLinks(PrintStream logger, EnvVarsAction envVarsAction, int apkIndex, String buildUrl)
             throws IOException, InterruptedException {
-        EnvVarsAction envData = new EnvVarsAction();
         if (apkIndex == 0) {
-            envData.add(logger, ENV_VAR_BUILD_URL, buildUrl);
+            envVarsAction.add(logger, ENV_VAR_BUILD_URL, buildUrl);
         }
-        envData.add(logger, ENV_VAR_BUILD_URL + "_" + apkIndex, buildUrl);
-        build.addAction(envData);
+        envVarsAction.add(logger, ENV_VAR_BUILD_URL + "_" + apkIndex, buildUrl);
     }
 
     private File prepareCrashlytics(PrintStream logger, File manifestFile) throws IOException, InterruptedException {
