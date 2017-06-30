@@ -11,14 +11,12 @@ import java.util.Locale;
 import java.util.Properties;
 
 class AppRelease {
-    final String appName;
-    final String packageName;
-    final String instanceId;
-    final String displayVersion;
-    final String buildVersion;
+    private final String packageName;
+    private final String instanceId;
+    private final String displayVersion;
+    private final String buildVersion;
 
-    AppRelease(String appName, String packageName, String instanceId, String displayVersion, String buildVersion) {
-        this.appName = appName;
+    private AppRelease(String packageName, String instanceId, String displayVersion, String buildVersion) {
         this.packageName = packageName;
         this.instanceId = instanceId;
         this.displayVersion = displayVersion;
@@ -32,12 +30,11 @@ class AppRelease {
             Properties buildProperties = new Properties();
             buildProperties.load(zin);
             if (!buildProperties.isEmpty()) {
-                String appName = buildProperties.getProperty("app_name");
                 String packageName = buildProperties.getProperty("package_name");
                 String instanceId = buildProperties.getProperty("build_id");
                 String displayVersion = buildProperties.getProperty("version_name");
                 String buildVersion = buildProperties.getProperty("version_code");
-                return new AppRelease(appName, packageName, instanceId, displayVersion, buildVersion);
+                return new AppRelease(packageName, instanceId, displayVersion, buildVersion);
             }
             return null;
         }
