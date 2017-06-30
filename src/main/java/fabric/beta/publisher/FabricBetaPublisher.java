@@ -1,26 +1,11 @@
 package fabric.beta.publisher;
 
 import com.google.common.base.Strings;
-import hudson.model.*;
-import net.lingala.zip4j.exception.ZipException;
-import net.sf.json.JSONObject;
-
-import org.kohsuke.stapler.DataBoundConstructor;
-import org.kohsuke.stapler.QueryParameter;
-import org.kohsuke.stapler.StaplerRequest;
-
-import java.io.*;
-import java.nio.file.Files;
-import java.nio.file.Paths;
-import java.util.*;
-
-import javax.annotation.Nonnull;
-import javax.servlet.ServletException;
-
 import hudson.EnvVars;
 import hudson.Extension;
 import hudson.FilePath;
 import hudson.Launcher;
+import hudson.model.*;
 import hudson.scm.ChangeLogSet;
 import hudson.tasks.BuildStepDescriptor;
 import hudson.tasks.BuildStepMonitor;
@@ -28,6 +13,20 @@ import hudson.tasks.Publisher;
 import hudson.tasks.Recorder;
 import hudson.util.FormValidation;
 import jenkins.tasks.SimpleBuildStep;
+import net.lingala.zip4j.exception.ZipException;
+import net.sf.json.JSONObject;
+import org.kohsuke.stapler.DataBoundConstructor;
+import org.kohsuke.stapler.QueryParameter;
+import org.kohsuke.stapler.StaplerRequest;
+
+import javax.annotation.Nonnull;
+import javax.servlet.ServletException;
+import java.io.*;
+import java.nio.file.Files;
+import java.nio.file.Paths;
+import java.util.ArrayList;
+import java.util.Arrays;
+import java.util.List;
 
 import static fabric.beta.publisher.FileUtils.downloadCrashlyticsTools;
 import static fabric.beta.publisher.FileUtils.getManifestFile;
@@ -75,6 +74,7 @@ public class FabricBetaPublisher extends Recorder implements SimpleBuildStep {
     @Override
     public boolean perform(@Nonnull AbstractBuild<?, ?> build, @Nonnull Launcher launcher,
                            @Nonnull BuildListener listener) throws IOException, InterruptedException {
+        if (build.getResult().isWorseOrEqualTo(Result.FAILURE)) return false;
         PrintStream logger = listener.getLogger();
         ChangeLogSet<? extends ChangeLogSet.Entry> changeLogSet = build.getChangeSet();
         return publishFabric(build, build.getEnvironment(listener), build.getWorkspace(), logger, changeLogSet);
@@ -83,6 +83,10 @@ public class FabricBetaPublisher extends Recorder implements SimpleBuildStep {
     @Override
     public void perform(@Nonnull Run build, @Nonnull FilePath workspace, @Nonnull Launcher launcher,
                         @Nonnull TaskListener listener) throws InterruptedException, IOException {
+        if (build.getResult() != null && build.getResult().isWorseOrEqualTo(Result.FAILURE)) {
+            build.setResult(Result.FAILURE);
+            return;
+        }
         PrintStream logger = listener.getLogger();
         ChangeLogSet<? extends ChangeLogSet.Entry> changeLogSet = getChangeLogSetFromRun(build);
         if (!publishFabric(build, build.getEnvironment(listener), workspace, logger, changeLogSet)) {
@@ -182,7 +186,7 @@ public class FabricBetaPublisher extends Recorder implements SimpleBuildStep {
             throws IOException, InterruptedException {
         EnvVarsAction envData = new EnvVarsAction();
         if (apkIndex == 0) {
-            envData.add(logger, "FABRIC_BETA_INSTALL_URL", buildUrl);
+            envData.add(logger, "FABRIC_BETA_BUILD_URL", buildUrl);
         }
         envData.add(logger, "FABRIC_BETA_BUILD_URL_" + apkIndex, buildUrl);
         build.addAction(envData);
