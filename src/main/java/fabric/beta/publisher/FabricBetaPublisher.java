@@ -21,12 +21,16 @@ import org.kohsuke.stapler.StaplerRequest;
 
 import javax.annotation.Nonnull;
 import javax.servlet.ServletException;
-import java.io.*;
+import java.io.File;
+import java.io.IOException;
+import java.io.InterruptedIOException;
+import java.io.PrintStream;
 import java.util.ArrayList;
 import java.util.Arrays;
 import java.util.List;
 
 import static fabric.beta.publisher.ChangelogReader.getChangeLogSet;
+import static fabric.beta.publisher.CommandRunner.runCommand;
 import static fabric.beta.publisher.FileUtils.downloadCrashlyticsTools;
 import static fabric.beta.publisher.FileUtils.getManifestFile;
 import static fabric.beta.publisher.ReleaseNotesFormatter.getReleaseNotes;
@@ -157,17 +161,7 @@ public class FabricBetaPublisher extends Recorder implements SimpleBuildStep {
         }
 
         List<String> command = buildCrashlyticsCommand(environment, manifestFile, apkFile, crashlyticsToolsFile, releaseNotes);
-        logger.println("Executing command: " + command);
-
-        boolean success = true;
-        Process p = new ProcessBuilder(command).start();
-        String s;
-        BufferedReader stdError = new BufferedReader(new InputStreamReader(p.getErrorStream(), "UTF-8"));
-        while ((s = stdError.readLine()) != null) {
-            logger.println(s);
-            success = false;
-        }
-        stdError.close();
+        boolean success = runCommand(logger, command);
         if (shouldDeleteApk) {
             FileUtils.delete(logger, apkFile);
         }
