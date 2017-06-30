@@ -22,25 +22,25 @@ import org.kohsuke.stapler.StaplerRequest;
 import javax.annotation.Nonnull;
 import javax.servlet.ServletException;
 import java.io.*;
-import java.nio.file.Files;
-import java.nio.file.Paths;
 import java.util.ArrayList;
 import java.util.Arrays;
 import java.util.List;
 
-import static fabric.beta.publisher.ChangelogReader.getChangeLogSetFromRun;
+import static fabric.beta.publisher.ChangelogReader.getChangeLogSet;
 import static fabric.beta.publisher.FileUtils.downloadCrashlyticsTools;
 import static fabric.beta.publisher.FileUtils.getManifestFile;
+import static fabric.beta.publisher.ReleaseNotesFormatter.getReleaseNotes;
 
 public class FabricBetaPublisher extends Recorder implements SimpleBuildStep {
-    public static final String ENV_VAR_BUILD_URL = "FABRIC_BETA_BUILD_URL";
-    private static final String RELEASE_NOTES_TYPE_FILE = "RELEASE_NOTES_FILE";
-    private static final String RELEASE_NOTES_TYPE_PARAMETER = "RELEASE_NOTES_PARAMETER";
-    private static final String RELEASE_NOTES_TYPE_CHANGELOG = "RELEASE_NOTES_FROM_CHANGELOG";
-    private static final String RELEASE_NOTES_TYPE_NONE = "RELEASE_NOTES_NONE";
+    static final String RELEASE_NOTES_TYPE_FILE = "RELEASE_NOTES_FILE";
+    static final String RELEASE_NOTES_TYPE_PARAMETER = "RELEASE_NOTES_PARAMETER";
+    static final String RELEASE_NOTES_TYPE_CHANGELOG = "RELEASE_NOTES_FROM_CHANGELOG";
+    static final String RELEASE_NOTES_TYPE_NONE = "RELEASE_NOTES_NONE";
+    private static final String ENV_VAR_BUILD_URL = "FABRIC_BETA_BUILD_URL";
     private static final String NOTIFY_TESTERS_TYPE_NONE = "NOTIFY_TESTERS_NONE";
     private static final String NOTIFY_TESTERS_TYPE_EMAILS = "NOTIFY_TESTERS_EMAILS";
     private static final String NOTIFY_TESTERS_GROUP = "NOTIFY_TESTERS_GROUP";
+
     private final String apiKey;
     private final String buildSecret;
     private final String releaseNotesType;
@@ -74,26 +74,34 @@ public class FabricBetaPublisher extends Recorder implements SimpleBuildStep {
     @Override
     public boolean perform(@Nonnull AbstractBuild<?, ?> build, @Nonnull Launcher launcher,
                            @Nonnull BuildListener listener) throws IOException, InterruptedException {
-        if (build.getResult().isWorseOrEqualTo(Result.FAILURE)) return false;
         PrintStream logger = listener.getLogger();
-        ChangeLogSet<? extends ChangeLogSet.Entry> changeLogSet = build.getChangeSet();
-        return publishFabric(build, build.getEnvironment(listener), build.getWorkspace(), logger, changeLogSet);
+        if (build.getResult().isWorseOrEqualTo(Result.FAILURE)) {
+            logger.println("Aborting Fabric Beta upload since build has failed.");
+            return false;
+        }
+        return publishFabric(build, build.getEnvironment(listener), build.getWorkspace(),
+                logger, getChangeLogSet(build));
     }
 
     @Override
     public void perform(@Nonnull Run build, @Nonnull FilePath workspace, @Nonnull Launcher launcher,
                         @Nonnull TaskListener listener) throws InterruptedException, IOException {
+        PrintStream logger = listener.getLogger();
         if (build.getResult() != null && build.getResult().isWorseOrEqualTo(Result.FAILURE)) {
+            logger.println("Aborting Fabric Beta upload since build has failed.");
             build.setResult(Result.FAILURE);
             return;
         }
-        PrintStream logger = listener.getLogger();
-        ChangeLogSet<? extends ChangeLogSet.Entry> changeLogSet = getChangeLogSetFromRun(build);
-        if (!publishFabric(build, build.getEnvironment(listener), workspace, logger, changeLogSet)) {
+        boolean success = publishFabric(
+                build, build.getEnvironment(listener), workspace, logger, getChangeLogSet(build));
+        if (!success) {
             build.setResult(Result.FAILURE);
         }
     }
 
+    /**
+     * @return true if all APKs have been published successfully.
+     */
     private boolean publishFabric(Run build, EnvVars environment, FilePath workspace, PrintStream logger,
                                   ChangeLogSet<? extends ChangeLogSet.Entry> changeLogSet)
             throws InterruptedException, IOException {
@@ -106,21 +114,25 @@ public class FabricBetaPublisher extends Recorder implements SimpleBuildStep {
             return false;
         }
 
-        String releaseNotes = getReleaseNotes(environment, changeLogSet);
+        String releaseNotes = getReleaseNotes(
+                changeLogSet, releaseNotesType, releaseNotesParameter, releaseNotesFile, environment);
 
         final List<FilePath> apkFilePaths = getApkFilePaths(environment, workspace);
-        boolean failure = apkFilePaths.isEmpty();
+        boolean success = !apkFilePaths.isEmpty();
         for (int apkIndex = 0; apkIndex < apkFilePaths.size(); apkIndex++) {
-            failure = uploadApkFile(build, apkIndex, environment, logger, manifestFile, crashlyticsToolsFile,
-                    releaseNotes, failure, apkFilePaths.get(apkIndex));
+            success &= uploadApkFile(build, apkIndex, environment, logger, manifestFile, crashlyticsToolsFile,
+                    releaseNotes, apkFilePaths.get(apkIndex));
         }
         FileUtils.delete(logger, manifestFile, crashlyticsToolsFile);
-        return !failure;
+        return success;
     }
 
+    /**
+     * @return true if APK file has been uploaded successfuly.
+     */
     private boolean uploadApkFile(Run build, int apkIndex, EnvVars environment, PrintStream logger,
                                   File manifestFile, File crashlyticsToolsFile, String releaseNotes,
-                                  boolean failure, FilePath apkFilePath) throws IOException, InterruptedException {
+                                  FilePath apkFilePath) throws IOException, InterruptedException {
         File apkFile;
         boolean shouldDeleteApk;
         if (apkFilePath.isRemote()) {
@@ -141,7 +153,6 @@ public class FabricBetaPublisher extends Recorder implements SimpleBuildStep {
                 }
             } catch (ZipException e) {
                 e.printStackTrace();
-                failure = true;
             }
         } else {
             logger.println("Skipped constructing Fabric Beta link because organization is not set.");
@@ -150,18 +161,19 @@ public class FabricBetaPublisher extends Recorder implements SimpleBuildStep {
         List<String> command = buildCrashlyticsCommand(environment, manifestFile, apkFile, crashlyticsToolsFile, releaseNotes);
         logger.println("Executing command: " + command);
 
+        boolean success = true;
         Process p = new ProcessBuilder(command).start();
         String s;
         BufferedReader stdError = new BufferedReader(new InputStreamReader(p.getErrorStream(), "UTF-8"));
         while ((s = stdError.readLine()) != null) {
             logger.println(s);
-            failure = true;
+            success = false;
         }
         stdError.close();
         if (shouldDeleteApk) {
             FileUtils.delete(logger, apkFile);
         }
-        return failure;
+        return success;
     }
 
     private void saveBuildLinks(PrintStream logger, Run build, int apkIndex, String buildUrl)
@@ -194,35 +206,6 @@ public class FabricBetaPublisher extends Recorder implements SimpleBuildStep {
                 filePaths.add(new FilePath(workspace, expand(environment, oneApkPath.trim())));
             }
             return filePaths;
-        }
-    }
-
-    private String getReleaseNotes(EnvVars environment, ChangeLogSet<? extends ChangeLogSet.Entry> changeLogSet)
-            throws IOException, InterruptedException {
-        switch (releaseNotesType) {
-            case RELEASE_NOTES_TYPE_NONE:
-                return null;
-            case RELEASE_NOTES_TYPE_PARAMETER:
-                return environment.get(releaseNotesParameter, "");
-            case RELEASE_NOTES_TYPE_CHANGELOG:
-                StringBuilder sb = new StringBuilder();
-                if (!changeLogSet.isEmptySet()) {
-                    boolean hasManyChangeSets = changeLogSet.getItems().length > 1;
-                    for (ChangeLogSet.Entry entry : changeLogSet) {
-                        sb.append("\n");
-                        if (hasManyChangeSets) {
-                            sb.append("* ");
-                        }
-                        sb.append(entry.getMsg());
-                    }
-                }
-                return sb.toString();
-            case RELEASE_NOTES_TYPE_FILE:
-                String releaseNotesFilePath = expand(environment, releaseNotesFile);
-                byte[] fileContent = Files.readAllBytes(Paths.get(releaseNotesFilePath));
-                return new String(fileContent, "UTF-8");
-            default:
-                return null;
         }
     }
 
@@ -266,23 +249,22 @@ public class FabricBetaPublisher extends Recorder implements SimpleBuildStep {
         command.add(apkFile.getPath());
         command.add("-betaDistributionNotifications");
         command.add(String.valueOf(shouldSendNotifications()));
-        if (NOTIFY_TESTERS_TYPE_EMAILS.equals(notifyTestersType) && testersEmails != null && !testersEmails.isEmpty()) {
+        if (NOTIFY_TESTERS_TYPE_EMAILS.equals(notifyTestersType) && !Strings.isNullOrEmpty(testersEmails)) {
             command.add("-betaDistributionEmails");
             command.add(expand(environment, testersEmails));
         }
-        if (NOTIFY_TESTERS_GROUP.equals(notifyTestersType) && testersGroup != null && !testersGroup.isEmpty()) {
+        if (NOTIFY_TESTERS_GROUP.equals(notifyTestersType) && !Strings.isNullOrEmpty(testersGroup)) {
             command.add("-betaDistributionGroupAliases");
             command.add(expand(environment, testersGroup));
         }
-        if (releaseNotes != null && !releaseNotes.isEmpty()) {
+        if (!Strings.isNullOrEmpty(releaseNotes)) {
             command.add("-betaDistributionReleaseNotes");
             command.add(releaseNotes);
         }
         return command;
     }
 
-    private String expand(EnvVars environment, String s)
-            throws IOException, InterruptedException {
+    private String expand(EnvVars environment, String s) throws IOException, InterruptedException {
         return environment.expand(s);
     }
 

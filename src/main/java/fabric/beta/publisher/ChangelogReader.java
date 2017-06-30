@@ -4,7 +4,10 @@ import hudson.model.*;
 import hudson.scm.ChangeLogSet;
 
 class ChangelogReader {
-    static ChangeLogSet<? extends ChangeLogSet.Entry> getChangeLogSetFromRun(Run<?, ?> build) {
+    static ChangeLogSet<? extends ChangeLogSet.Entry> getChangeLogSet(Run<?, ?> build) {
+        if (build instanceof AbstractBuild) {
+            return ((AbstractBuild<?, ?>) build).getChangeSet();
+        }
         ItemGroup<?> itemGroup = build.getParent().getParent();
         for (Item item : itemGroup.getItems()) {
             if (!item.getFullDisplayName().equals(build.getFullDisplayName())
