@@ -79,8 +79,7 @@ public class FabricBetaPublisher extends Recorder implements SimpleBuildStep {
             logger.println("Aborting Fabric Beta upload since build has failed.");
             return false;
         }
-        return publishFabric(build, build.getEnvironment(listener), build.getWorkspace(),
-                logger, getChangeLogSet(build));
+        return publishFabric(build, build.getEnvironment(listener), build.getWorkspace(), logger, getChangeLogSet(build));
     }
 
     @Override
@@ -92,8 +91,7 @@ public class FabricBetaPublisher extends Recorder implements SimpleBuildStep {
             build.setResult(Result.FAILURE);
             return;
         }
-        boolean success = publishFabric(
-                build, build.getEnvironment(listener), workspace, logger, getChangeLogSet(build));
+        boolean success = publishFabric(build, build.getEnvironment(listener), workspace, logger, getChangeLogSet(build));
         if (!success) {
             build.setResult(Result.FAILURE);
         }
@@ -117,7 +115,7 @@ public class FabricBetaPublisher extends Recorder implements SimpleBuildStep {
         String releaseNotes = getReleaseNotes(
                 changeLogSet, releaseNotesType, releaseNotesParameter, releaseNotesFile, environment);
 
-        final List<FilePath> apkFilePaths = getApkFilePaths(environment, workspace);
+        List<FilePath> apkFilePaths = getApkFilePaths(environment, workspace);
         boolean success = !apkFilePaths.isEmpty();
         for (int apkIndex = 0; apkIndex < apkFilePaths.size(); apkIndex++) {
             success &= uploadApkFile(build, apkIndex, environment, logger, manifestFile, crashlyticsToolsFile,
@@ -198,10 +196,9 @@ public class FabricBetaPublisher extends Recorder implements SimpleBuildStep {
 
     private List<FilePath> getApkFilePaths(EnvVars environment, FilePath workspace) throws IOException, InterruptedException {
         if (useAntStyleInclude) {
-            final FilePath[] filePaths = workspace.list(expand(environment, apkPath));
-            return Arrays.asList(filePaths);
+            return Arrays.asList(workspace.list(expand(environment, apkPath)));
         } else {
-            final List<FilePath> filePaths = new ArrayList<>();
+            List<FilePath> filePaths = new ArrayList<>();
             for (String oneApkPath : apkPath.split(",")) {
                 filePaths.add(new FilePath(workspace, expand(environment, oneApkPath.trim())));
             }
@@ -209,8 +206,8 @@ public class FabricBetaPublisher extends Recorder implements SimpleBuildStep {
         }
     }
 
-    private List<String> buildCrashlyticsCommand(EnvVars environment,
-                                                 File manifestFile, File apkFile, File toolsFile, String releaseNotes)
+    private List<String> buildCrashlyticsCommand(EnvVars environment, File manifestFile, File apkFile, File toolsFile,
+                                                 String releaseNotes)
             throws IOException, InterruptedException {
         List<String> command = new ArrayList<>();
         command.add("java");
