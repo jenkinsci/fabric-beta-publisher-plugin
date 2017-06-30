@@ -155,15 +155,17 @@ public class FabricBetaPublisher extends Recorder implements SimpleBuildStep {
             shouldDeleteApk = false;
         }
 
-        try {
-            AppRelease appRelease = AppRelease.from(apkFile);
-            if (appRelease == null) {
-                throw new InterruptedIOException("Could not read APK properties for apk " + apkFile);
-            } else {
-                saveBuildLinks(logger, envVarsAction, apkIndex, appRelease.buildLink(organization));
+        if (envVarsAction != null) {
+            try {
+                AppRelease appRelease = AppRelease.from(apkFile);
+                if (appRelease == null) {
+                    throw new InterruptedIOException("Could not read APK properties for apk " + apkFile);
+                } else {
+                    saveBuildLinks(logger, envVarsAction, apkIndex, appRelease.buildLink(organization));
+                }
+            } catch (ZipException e) {
+                e.printStackTrace();
             }
-        } catch (ZipException e) {
-            e.printStackTrace();
         }
 
         List<String> command = buildCrashlyticsCommand(environment, manifestFile, apkFile, crashlyticsToolsFile, releaseNotes);
