@@ -3,7 +3,7 @@ A Jenkins plugin that lets you publish Android apps to [Fabric Beta](https://doc
 
 ## Features
 
-* Upload .apk file to Fabric Beta
+* Upload APK file to Fabric Beta
 * Choose to notify testers
   * By a group alias
   * By a list of e-mails
@@ -12,6 +12,7 @@ A Jenkins plugin that lets you publish Android apps to [Fabric Beta](https://doc
   * With a build parameter
   * From a text file
 * Pipeline support
+* Add `FABRIC_BETA_BUILD_URL` and `FABRIC_BETA_BUILD_URL_{n}` environment variables after successful upload. The `{n}` is replaced with the APK index.
 
 ## Screenshot
 
