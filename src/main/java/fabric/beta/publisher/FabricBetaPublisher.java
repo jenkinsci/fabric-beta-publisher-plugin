@@ -119,7 +119,7 @@ public class FabricBetaPublisher extends Recorder implements SimpleBuildStep {
         }
 
         String releaseNotes = getReleaseNotes(
-                changeLogSet, releaseNotesType, releaseNotesParameter, releaseNotesFile, environment);
+                changeLogSet, releaseNotesType, releaseNotesParameter, releaseNotesFile, environment, workspace);
 
         EnvVarsAction envVarsAction = null;
         if (!Strings.isNullOrEmpty(organization)) {
