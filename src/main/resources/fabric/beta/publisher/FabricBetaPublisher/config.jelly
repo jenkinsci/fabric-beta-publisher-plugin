@@ -59,7 +59,7 @@
                       checked="${instance.isReleaseNotesType('RELEASE_NOTES_FILE')}" inline="true">
             <f:nested>
                 <f:entry title="Changelog file path" field="releaseNotesFile">
-                    <f:textbox default="$WORKSPACE/release_notes.txt"/>
+                    <f:textbox default="release_notes.txt"/>
                 </f:entry>
             </f:nested>
         </f:radioBlock>
