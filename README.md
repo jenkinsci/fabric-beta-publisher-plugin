@@ -1,6 +1,8 @@
 # fabric-beta-publisher
 A Jenkins plugin that lets you publish Android apps to [Fabric Beta](https://docs.fabric.io/android/beta/overview.html).
 
+[Jenkins Plugins Page](https://plugins.jenkins.io/fabric-beta-publisher)
+
 ## Features
 
 * Upload APK file to Fabric Beta
