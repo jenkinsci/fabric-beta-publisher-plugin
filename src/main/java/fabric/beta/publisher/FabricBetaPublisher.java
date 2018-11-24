@@ -15,6 +15,7 @@ import hudson.util.FormValidation;
 import jenkins.tasks.SimpleBuildStep;
 import net.lingala.zip4j.exception.ZipException;
 import net.sf.json.JSONObject;
+import org.jenkinsci.Symbol;
 import org.kohsuke.stapler.DataBoundConstructor;
 import org.kohsuke.stapler.QueryParameter;
 import org.kohsuke.stapler.StaplerRequest;
@@ -347,6 +348,7 @@ public class FabricBetaPublisher extends Recorder implements SimpleBuildStep {
     }
 
     @Extension
+    @Symbol("fabric")
     public static final class DescriptorImpl extends BuildStepDescriptor<Publisher> {
         public DescriptorImpl() {
             load();
