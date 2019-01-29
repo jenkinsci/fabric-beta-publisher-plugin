@@ -13,7 +13,6 @@ import hudson.tasks.Publisher;
 import hudson.tasks.Recorder;
 import hudson.util.FormValidation;
 import jenkins.tasks.SimpleBuildStep;
-import net.lingala.zip4j.exception.ZipException;
 import net.sf.json.JSONObject;
 import org.jenkinsci.Symbol;
 import org.kohsuke.stapler.DataBoundConstructor;
@@ -21,7 +20,6 @@ import org.kohsuke.stapler.QueryParameter;
 import org.kohsuke.stapler.StaplerRequest;
 
 import javax.annotation.Nonnull;
-import javax.servlet.ServletException;
 import java.io.File;
 import java.io.IOException;
 import java.io.InterruptedIOException;
@@ -32,8 +30,7 @@ import java.util.List;
 
 import static fabric.beta.publisher.ChangelogReader.getChangeLogSet;
 import static fabric.beta.publisher.CommandRunner.runCommand;
-import static fabric.beta.publisher.FileUtils.downloadCrashlyticsTools;
-import static fabric.beta.publisher.FileUtils.getManifestFile;
+import static fabric.beta.publisher.FileUtils.*;
 import static fabric.beta.publisher.ReleaseNotesFormatter.getReleaseNotes;
 
 public class FabricBetaPublisher extends Recorder implements SimpleBuildStep {
@@ -159,15 +156,11 @@ public class FabricBetaPublisher extends Recorder implements SimpleBuildStep {
         }
 
         if (envVarsAction != null) {
-            try {
-                AppRelease appRelease = AppRelease.from(apkFile);
-                if (appRelease == null) {
-                    throw new InterruptedIOException("Could not read APK properties for apk " + apkFile);
-                } else {
-                    saveBuildLinks(logger, envVarsAction, apkIndex, appRelease.buildLink(organization));
-                }
-            } catch (ZipException e) {
-                e.printStackTrace();
+            AppRelease appRelease = AppRelease.from(apkFile);
+            if (appRelease == null) {
+                throw new InterruptedIOException("Could not read APK properties for apk " + apkFile);
+            } else {
+                saveBuildLinks(logger, envVarsAction, apkIndex, appRelease.buildLink(organization));
             }
         }
 
@@ -179,8 +172,7 @@ public class FabricBetaPublisher extends Recorder implements SimpleBuildStep {
         return success;
     }
 
-    private void saveBuildLinks(PrintStream logger, EnvVarsAction envVarsAction, int apkIndex, String buildUrl)
-            throws IOException, InterruptedException {
+    private void saveBuildLinks(PrintStream logger, EnvVarsAction envVarsAction, int apkIndex, String buildUrl) {
         if (apkIndex == 0) {
             envVarsAction.add(logger, ENV_VAR_BUILD_URL, buildUrl);
         }
@@ -189,8 +181,10 @@ public class FabricBetaPublisher extends Recorder implements SimpleBuildStep {
 
     private File prepareCrashlytics(PrintStream logger, File manifestFile) throws IOException, InterruptedException {
         try {
-            return downloadCrashlyticsTools(logger);
-        } catch (ZipException e) {
+
+            File crashlyticsZip = downloadCrashlyticsTools(logger);
+            return extractCrashlyticsJar(crashlyticsZip, logger);
+        } catch (IOException e) {
             logger.println("Error downloading crashlytics-devtools.jar: " + e.getMessage());
             FileUtils.delete(logger, manifestFile);
         }
@@ -210,8 +204,7 @@ public class FabricBetaPublisher extends Recorder implements SimpleBuildStep {
     }
 
     private List<String> buildCrashlyticsCommand(EnvVars environment, File manifestFile, File apkFile, File toolsFile,
-                                                 String releaseNotes)
-            throws IOException, InterruptedException {
+                                                 String releaseNotes) {
         List<String> command = new ArrayList<>();
         command.add("java");
 
@@ -264,7 +257,7 @@ public class FabricBetaPublisher extends Recorder implements SimpleBuildStep {
         return command;
     }
 
-    private String expand(EnvVars environment, String s) throws IOException, InterruptedException {
+    private String expand(EnvVars environment, String s) {
         return environment.expand(s);
     }
 
@@ -355,8 +348,7 @@ public class FabricBetaPublisher extends Recorder implements SimpleBuildStep {
         }
 
         @SuppressWarnings("unused")
-        public FormValidation doCheckApiKey(@QueryParameter String value)
-                throws IOException, ServletException {
+        public FormValidation doCheckApiKey(@QueryParameter String value) {
             if (value.length() == 0) {
                 return FormValidation.error("Please input a Fabric API key");
             }
@@ -364,8 +356,7 @@ public class FabricBetaPublisher extends Recorder implements SimpleBuildStep {
         }
 
         @SuppressWarnings("unused")
-        public FormValidation doCheckBuildSecret(@QueryParameter String value)
-                throws IOException, ServletException {
+        public FormValidation doCheckBuildSecret(@QueryParameter String value) {
             if (value.length() == 0) {
                 return FormValidation.error("Please input a Fabric build secret");
             }
@@ -373,8 +364,7 @@ public class FabricBetaPublisher extends Recorder implements SimpleBuildStep {
         }
 
         @SuppressWarnings("unused")
-        public FormValidation doCheckApkPath(@QueryParameter String value)
-                throws IOException, ServletException {
+        public FormValidation doCheckApkPath(@QueryParameter String value) {
             if (value.length() == 0) {
                 return FormValidation.error("Please input an .apk file path");
             }
