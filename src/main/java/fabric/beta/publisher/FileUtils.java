@@ -7,6 +7,7 @@ import retrofit2.Response;
 import java.io.*;
 import java.nio.file.Files;
 import java.util.zip.ZipEntry;
+import java.util.zip.ZipInputStream;
 
 class FileUtils {
     static File getManifestFile() throws IOException, InterruptedException {
@@ -47,26 +48,37 @@ class FileUtils {
     }
 
     static void unzip(String zipFilePath, File destDir) throws IOException {
-        byte[] buffer = new byte[1024];
-        FileInputStream fis = new FileInputStream(zipFilePath);
-        java.util.zip.ZipInputStream zis = new java.util.zip.ZipInputStream(fis);
-        ZipEntry ze = zis.getNextEntry();
-        while (ze != null) {
-            String fileName = ze.getName();
-            File newFile = new File(destDir, fileName);
-            new File(newFile.getParent()).mkdirs();
-            FileOutputStream fos = new FileOutputStream(newFile);
-            int len;
-            while ((len = zis.read(buffer)) > 0) {
-                fos.write(buffer, 0, len);
+        FileInputStream fis = null;
+        ZipInputStream zis = null;
+        try {
+            byte[] buffer = new byte[1024];
+            fis = new FileInputStream(zipFilePath);
+            zis = new ZipInputStream(fis);
+            ZipEntry ze = zis.getNextEntry();
+            while (ze != null) {
+                String fileName = ze.getName();
+                File newFile = new File(destDir, fileName);
+                File parentFile = new File(newFile.getParent());
+                boolean folderCreated = parentFile.mkdirs();
+                try (FileOutputStream fos = new FileOutputStream(newFile)) {
+                    int len;
+                    while ((len = zis.read(buffer)) > 0) {
+                        fos.write(buffer, 0, len);
+                    }
+                }
+                zis.closeEntry();
+                ze = zis.getNextEntry();
             }
-            fos.close();
-            zis.closeEntry();
-            ze = zis.getNextEntry();
+
+        } finally {
+            if (zis != null) {
+                zis.closeEntry();
+                zis.close();
+            }
+            if (fis != null) {
+                fis.close();
+            }
         }
-        zis.closeEntry();
-        zis.close();
-        fis.close();
     }
 
     static File createTempDirectory() throws IOException {
