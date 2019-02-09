@@ -1,14 +1,14 @@
 package fabric.beta.publisher;
 
-import net.lingala.zip4j.core.ZipFile;
-import net.lingala.zip4j.exception.ZipException;
-import net.lingala.zip4j.io.ZipInputStream;
-import net.lingala.zip4j.model.FileHeader;
 
 import java.io.File;
+import java.io.FileInputStream;
 import java.io.IOException;
 import java.util.Locale;
 import java.util.Properties;
+
+import static fabric.beta.publisher.FileUtils.createTempDirectory;
+import static fabric.beta.publisher.FileUtils.unzip;
 
 class AppRelease {
     private final String packageName;
@@ -23,12 +23,13 @@ class AppRelease {
         this.buildVersion = buildVersion;
     }
 
-    static AppRelease from(File apkFile) throws IOException, ZipException {
-        ZipFile zipFile = new ZipFile(apkFile);
-        FileHeader fileHeader = zipFile.getFileHeader("assets/crashlytics-build.properties");
-        try (ZipInputStream zin = zipFile.getInputStream(fileHeader)) {
+    static AppRelease from(File apkFile) throws IOException {
+        File dest = createTempDirectory();
+        unzip(apkFile.getAbsolutePath(), dest);
+        File propertiesFile = new File(dest, "assets/crashlytics-build.properties");
+        try (FileInputStream inputStream = new FileInputStream(propertiesFile)) {
             Properties buildProperties = new Properties();
-            buildProperties.load(zin);
+            buildProperties.load(inputStream);
             if (!buildProperties.isEmpty()) {
                 String packageName = buildProperties.getProperty("package_name");
                 String instanceId = buildProperties.getProperty("build_id");
