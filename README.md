@@ -3,6 +3,9 @@ A Jenkins plugin that lets you publish Android apps to [Fabric Beta](https://doc
 
 [Jenkins Plugins Page](https://plugins.jenkins.io/fabric-beta-publisher)
 
+## Deprecation notice
+Fabric [will be deprecated](https://get.fabric.io/roadmap) on March 31st, 2020 – look into migrating to Firebase. This plugin will not be in active development anymore.
+
 ## Features
 
 * Upload APK file to Fabric Beta
