@@ -1,5 +1,2 @@
 /* step provided by: https://github.com/jenkins-infra/pipeline-library */
-buildPlugin(
-    platforms: ['linux'],
-    findbugs: [run: true, archive: true]
-)
+buildPlugin(platforms: ['linux'])
