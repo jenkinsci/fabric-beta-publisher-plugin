@@ -58,6 +58,9 @@ class FileUtils {
             while (ze != null) {
                 String fileName = ze.getName();
                 File newFile = new File(destDir, fileName);
+                if (!newFile.toPath().normalize().startsWith(destDir.toPath().normalize())) {
+                    throw new IOException("Bad zip entry");
+                }
                 File parentFile = new File(newFile.getParent());
                 boolean folderCreated = parentFile.mkdirs();
                 try (FileOutputStream fos = new FileOutputStream(newFile)) {
