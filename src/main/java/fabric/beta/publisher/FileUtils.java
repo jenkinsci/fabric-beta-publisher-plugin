@@ -82,15 +82,7 @@ class FileUtils {
     }
 
     static File createTempDirectory() throws IOException {
-        File temp = File.createTempFile("temp", Long.toString(System.nanoTime()));
-
-        if (!temp.delete()) {
-            throw new IOException("Could not delete temp file: " + temp.getAbsolutePath());
-        }
-
-        if (!temp.mkdir()) {
-            throw new IOException("Could not create temp directory: " + temp.getAbsolutePath());
-        }
+        File temp = Files.createTempDirectory("temp" + Long.toString(System.nanoTime())).toFile();
 
         return temp;
     }
